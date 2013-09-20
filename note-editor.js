@@ -109,25 +109,35 @@ const NoteEditor = new Lang.Class({
     },
 
     _next_page: function() {
+	this._update_note();
         this._doc_view.next_page();
-        let page = this._doc_model.get_page();
-        let note = this._nm.get_note_page(page);
+	this._curr_page = this._curr_page + 1;
+        let note = this._nm.get_note_page(this._curr_page);
         this._text_view.get_buffer().set_text(note, -1);
-        if (page == this._doc_n_pages - 1)
+        if (this._curr_page == this._doc_n_pages - 1)
             this._next_bt.set_sensitive(false);
-        if (page == 1)
+        if (this._curr_page == 1)
             this._prev_bt.set_sensitive(true);
     },
 
     _prev_page: function() {
+	this._update_note();
         this._doc_view.previous_page();
-        let page = this._doc_model.get_page();
-        let note = this._nm.get_note_page(page);
+	this._curr_page = this._curr_page - 1;
+        let note = this._nm.get_note_page(this._curr_page);
         this._text_view.get_buffer().set_text(note, -1);
-        if (page == 0)
+        if (this._curr_page == 0)
             this._prev_bt.set_sensitive(false);
-        if (page == this._doc_n_pages - 2)
+        if (this._curr_page == this._doc_n_pages - 2)
             this._next_bt.set_sensitive(true);
+    },
+
+    _update_note: function() {
+	let note = this._text_view.get_buffer().get_text(
+	    this._text_view.get_buffer().get_start_iter(),
+	    this._text_view.get_buffer().get_end_iter(),
+	    true);
+	this._nm.set_note_page(note, this._curr_page);
     }
 });
 

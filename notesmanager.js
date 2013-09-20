@@ -52,5 +52,18 @@ const NotesManager = new Lang.Class({
 
     get_note_page: function(page) {
         return this._object.get_member(String(page)).get_string();
+    },
+
+    set_note_page: function(note, page) {
+	let node = this._object.get_member(String(page));
+	if (note != node.get_string()) {
+	    node.set_string(note);
+	    this._object.set_member(String(page), node);
+	    let generator = new Json.Generator();
+	    let root = new Json.Node(Json.NodeType.OBJECT);
+	    root.take_object(this._object);
+	    generator.set_root(root);
+	    generator.to_file(this._file.get_path(), null);
+	}
     }
 });
