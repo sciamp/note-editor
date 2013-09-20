@@ -29,7 +29,7 @@ const NotesManager = new Lang.Class({
     _init: function(document_file) {
         this._page = -1;
         this._file = Gio.File.new_for_uri(document_file.get_uri()+".notes");
-        
+
         if (!this._file.query_exists(null)) {
             this._file.create(Gio.FileCreateFlags.NONE, null);
             this._file.append_to_async (Gio.FileCreateFlags.NONE, null, null,

@@ -22,96 +22,113 @@ const Gtk = imports.gi.Gtk;
 const Gio = imports.gi.Gio;
 const _ = imports.gettext.gettext;
 
+const Lang = imports.lang;
+
 const NotesManager = imports.notesmanager;
 
-Gtk.init(null, 0);
-EvDoc.init();
+const NoteEditor = new Lang.Class({
+    Name: 'NoteEditor',
 
-var doc_file = Gio.File.new_for_path("presentation.pdf");
-var doc = EvDoc.Document.factory_get_document_for_gfile(doc_file, EvDoc.DocumentLoadFlags.NONE, null);
-var n_pages = doc.get_n_pages() - 1;
-var doc_model = EvView.DocumentModel.new_with_document(doc);
-doc_model.set_continuous(false);
-var curr_page = doc_model.get_page();
-var doc_view = new EvView.View();
-doc_view.set_model(doc_model);
-doc_view.set_size_request(600, -1);
+    _init: function(doc_uri) {
+	Gtk.init(null, 0);
+	EvDoc.init();
 
-var ne_window = new Gtk.Window({ type: Gtk.WindowType.TOPLEVEL,
-                                 name: "note_editor",
-                                 title: _("Note Editor") });
-ne_window.connect("destroy",
-                  function() {
-                      Gtk.main_quit();
-                      EvDoc.shutdown(); });
+	this._load_document_view(doc_uri);
+	this._load_note_view();
 
-var next_bt = new Gtk.Button({ label: _("Next") });
-next_bt.connect("clicked",
-                function() {
-                    doc_view.next_page();
-                    let page = doc_model.get_page();
-                    note = nm.get_note_page(page);
-                    buffer.set_text(note, -1);
-                    text_view.set_buffer(buffer);
-                    if (page == n_pages)
-                        next_bt.set_sensitive(false);
-                    if (page == 1)
-                        prev_bt.set_sensitive(true);
-                    print(text_view.get_buffer().get_text(
-                        text_view.get_buffer().get_start_iter(),
-                        text_view.get_buffer().get_end_iter(),
-                        true));
-                });
-if (curr_page == n_pages)
-    next_bt.set_sensitive(false);
+	this._nm = new NotesManager.NotesManager(this._doc_file);
+	let note = this._nm.get_note_page(this._curr_page);
+	this._text_view.get_buffer().set_text(note, -1);
 
-var prev_bt = new Gtk.Button({ label: _("Previous") });
-prev_bt.connect("clicked",
-                function() {
-                    doc_view.previous_page();
-                    let page = doc_model.get_page();
-                    note = nm.get_note_page(page);
-                    buffer.set_text(note, -1);
-                    text_view.set_buffer(buffer);
-                    if (page == 0)
-                        prev_bt.set_sensitive(false);
-                    if (page == n_pages - 1)
-                        next_bt.set_sensitive(true);
-                });
-if (curr_page == 0)
-    prev_bt.set_sensitive(false);
+	Gtk.main();
+    },
 
-var bt_box = new Gtk.Box({ orientation: Gtk.Orientation.HORIZONTAL });
-bt_box.pack_start(prev_bt, false, false, 0);
-bt_box.pack_start(next_bt, false, false, 0);
+    _load_document_view: function(doc_uri) {
+	this._doc_file = Gio.File.new_for_uri(doc_uri);
+	let doc = EvDoc.Document.factory_get_document_for_gfile(
+	    this._doc_file,
+	    EvDoc.DocumentLoadFlags.NONE,
+	    null);
+	this._doc_n_pages = doc.get_n_pages();
+	this._doc_model = EvView.DocumentModel.new_with_document(doc);
+	this._curr_page = this._doc_model.get_page();
+	this._doc_model.set_continuous(false);
+	this._doc_view = new EvView.View();
+	this._doc_view.set_model(this._doc_model);
+	this._doc_view.set_size_request(600, -1);
+    },
 
-var text_view = new Gtk.TextView();
-text_view.set_wrap_mode(Gtk.WrapMode.WORD);
-var scrolled = new Gtk.ScrolledWindow({ hadjustment: null,
-                                        vadjustment: null });
-scrolled.add(text_view);
-scrolled.set_size_request(400, -1);
+    _load_note_view: function() {
+	this._window = new Gtk.Window({ type: Gtk.WindowType.TOPLEVEL,
+					name: "note_editor",
+					title: _("Note Editor") });
+	this._window.connect("destroy",
+			     function() {
+				 Gtk.main_quit();
+				 EvDoc.shutdown(); });
 
-var box = new Gtk.Box({ orientation: Gtk.Orientation.HORIZONTAL,
-                        spacing: 0 });
-var edit_box = new Gtk.Box({ orientation: Gtk.Orientation.VERTICAL,
-                             spacing: 0 });
+	this._next_bt = new Gtk.Button({ label: _("Next") });
+	this._prev_bt = new Gtk.Button({ label: _("Previous") });
+	this._next_bt.connect("clicked", Lang.bind(this, this._next_page));
+	this._prev_bt.connect("clicked", Lang.bind(this, this._prev_page));
+	if (this._curr_page == this._doc_n_pages)
+	    this._next_bt.set_sensitive(false);
+	if (this._curr_page == 0)
+	    this._prev_bt.set_sensitive(false);
 
-edit_box.pack_start(scrolled, true, true, 0);
-edit_box.pack_start(bt_box, false, true, 0);
+	this._bt_box = new Gtk.Box({
+	    orientation: Gtk.Orientation.HORIZONTAL });
+	this._bt_box.pack_start(this._prev_bt, false, false, 0);
+	this._bt_box.pack_start(this._next_bt, false, false, 0);
 
-box.set_homogeneous(true);
-box.pack_start(doc_view, true, true, 0);
-box.pack_start(edit_box, true, true, 0);
+	this._text_view = new Gtk.TextView();
+	this._text_view.set_wrap_mode(Gtk.WrapMode.WORD);
 
-ne_window.add(box);
+	this._scrolled = new Gtk.ScrolledWindow({ hadjustment: null,
+						  vadjustment: null });
+	this._scrolled.add(this._text_view);
+	this._scrolled.set_size_request(400, -1);
 
-ne_window.show_all();
+	this._box = new Gtk.Box({
+	    orientation: Gtk.Orientation.HORIZONTAL,
+	    spacing: 0 });
 
-var nm = new NotesManager.NotesManager(doc_file);
-var note = nm.get_note_page(curr_page);
-var buffer = new Gtk.TextBuffer();
-buffer.set_text(note, -1);
-text_view.set_buffer(buffer);
+	this._edit_box = new Gtk.Box({
+	    orientation: Gtk.Orientation.VERTICAL,
+	    spacing: 0 });
 
-Gtk.main();
+	this._edit_box.pack_start(this._scrolled, true, true, 0);
+	this._edit_box.pack_start(this._bt_box, false, true, 0);
+
+	this._box.set_homogeneous(true);
+	this._box.pack_start(this._doc_view, true, true, 0);
+	this._box.pack_start(this._edit_box, true, true, 0);
+
+	this._window.add(this._box);
+	this._window.show_all();
+    },
+
+    _next_page: function() {
+        this._doc_view.next_page();
+        let page = this._doc_model.get_page();
+        let note = this._nm.get_note_page(page);
+        this._text_view.get_buffer().set_text(note, -1);
+        if (page == this._doc_n_pages - 1)
+            this._next_bt.set_sensitive(false);
+        if (page == 1)
+            this._prev_bt.set_sensitive(true);
+    },
+
+    _prev_page: function() {
+        this._doc_view.previous_page();
+        let page = this._doc_model.get_page();
+        let note = this._nm.get_note_page(page);
+        this._text_view.get_buffer().set_text(note, -1);
+        if (page == 0)
+            this._prev_bt.set_sensitive(false);
+        if (page == this._doc_n_pages - 2)
+            this._next_bt.set_sensitive(true);
+    }
+});
+
+new NoteEditor("file:///home/gnomedev/Sources/note-editor/presentation.pdf");
